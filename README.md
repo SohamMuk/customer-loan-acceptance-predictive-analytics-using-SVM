@@ -11,4 +11,4 @@ over 9% success. This has encouraged the retail marketing department to devise s
 campaigns with better target marketing.
 The Universal Bank dataset used for this project include customer demographic information
 (age, income, etc.), the customer's relationship with the bank (mortgage, securities account, etc.),
-and the customer response to the last personal loan campaign (Personal Loan)
+and the customer response to the last personal loan campaign (Personal Loan).
