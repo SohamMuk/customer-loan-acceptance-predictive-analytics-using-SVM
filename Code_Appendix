@@ -1,0 +1,178 @@
+
+
+############################################
+# Loan Acceptance Modeling using SVM (R)
+# Author: Soham
+# Model: Support Vector Machine (Radial Kernel)
+############################################
+
+# -----------------------------
+# Install & Load Required Packages
+# -----------------------------
+install.packages(c("caret", "kernlab"))
+
+library(caret)
+library(kernlab)   # For svmRadial
+
+# -----------------------------
+# Import Dataset
+# -----------------------------
+ub.org <- read.csv("UB6PM-1.csv")
+
+# Inspect dataset
+str(ub.org)
+head(ub.org)
+
+summary(
+  ub.org[c("Age", "Experience", "Income", "Family", "CCAvg",
+           "Education", "Mortgage", "PersonalLoan",
+           "SecuritiesAccount", "CDAccount", "Online", "CreditCard")]
+)
+
+# -----------------------------
+# Train-Test Split (80–20)
+# -----------------------------
+set.seed(1209)
+
+idx <- createDataPartition(
+  y = ub.org$PersonalLoan,
+  p = 0.8,
+  list = FALSE
+)
+
+# -----------------------------
+# Convert Variables to Factors
+# -----------------------------
+ub.org$Family            <- factor(ub.org$Family)
+ub.org$Education         <- factor(ub.org$Education)
+ub.org$PersonalLoan      <- factor(ub.org$PersonalLoan)
+ub.org$SecuritiesAccount <- factor(ub.org$SecuritiesAccount)
+ub.org$CDAccount         <- factor(ub.org$CDAccount)
+ub.org$Online            <- factor(ub.org$Online)
+ub.org$CreditCard        <- factor(ub.org$CreditCard)
+
+# -----------------------------
+# Normalize Numerical Variables
+# -----------------------------
+normalize <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+ub.df <- as.data.frame(
+  lapply(
+    ub.org[c("Age", "Experience", "Income", "CCAvg", "Mortgage")],
+    normalize
+  )
+)
+
+# Combine normalized and categorical variables
+ub.final <- cbind(
+  ub.df,
+  ub.org[c("Family", "Education", "PersonalLoan",
+           "SecuritiesAccount", "CDAccount",
+           "Online", "CreditCard")]
+)
+
+summary(ub.final)
+
+# -----------------------------
+# Create Training and Test Sets
+# -----------------------------
+train.df <- ub.final[idx, ]
+test.df  <- ub.final[-idx, ]
+
+train_labels <- ub.final$PersonalLoan[idx]
+test_labels  <- ub.final$PersonalLoan[-idx]
+
+# -----------------------------
+# Build SVM Model (Baseline)
+# -----------------------------
+svm_model <- train(
+  PersonalLoan ~ .,
+  data = train.df,
+  method = "svmRadial",
+  trControl = trainControl(method = "cv", number = 10),
+  preProcess = c("center", "scale")
+)
+
+svm_model
+
+# -----------------------------
+# Model Evaluation
+# -----------------------------
+svm_predictions <- predict(svm_model, test.df)
+
+confusionMatrix(
+  svm_predictions,
+  test_labels,
+  positive = "1"
+)
+
+# -----------------------------
+# Hyperparameter Tuning
+# -----------------------------
+svm_grid <- expand.grid(
+  sigma = c(0.01, 0.02, 0.03, 0.05),
+  C     = c(0.5, 1, 2, 3)
+)
+
+svm_model_tuned <- train(
+  PersonalLoan ~ .,
+  data = train.df,
+  method = "svmRadial",
+  tuneGrid = svm_grid,
+  trControl = trainControl(method = "cv", number = 5),
+  preProcess = c("center", "scale")
+)
+
+svm_model_tuned
+
+# -----------------------------
+# Tuned Model Evaluation
+# -----------------------------
+svm_predictions_tuned <- predict(svm_model_tuned, test.df)
+
+confusionMatrix(
+  svm_predictions_tuned,
+  test_labels,
+  positive = "1"
+)
+
+# -----------------------------
+# Prediction for a New Customer
+# -----------------------------
+new.customer <- data.frame(
+  Age = 40,
+  Experience = 10,
+  Income = 84,
+  CCAvg = 2,
+  Mortgage = 0,
+  Family = 2,
+  Education = 2,
+  SecuritiesAccount = 0,
+  CDAccount = 0,
+  Online = 1,
+  CreditCard = 1
+)
+
+# Normalize new customer data
+normalize2 <- function(x, min_val, max_val) {
+  (x - min_val) / (max_val - min_val)
+}
+
+new.customer.norm <- data.frame(
+  Age = normalize2(40, min(ub.org$Age), max(ub.org$Age)),
+  Experience = normalize2(10, min(ub.org$Experience), max(ub.org$Experience)),
+  Income = normalize2(84, min(ub.org$Income), max(ub.org$Income)),
+  CCAvg = normalize2(2, min(ub.org$CCAvg), max(ub.org$CCAvg)),
+  Mortgage = normalize2(0, min(ub.org$Mortgage), max(ub.org$Mortgage)),
+  Family = factor(2, levels = levels(ub.org$Family)),
+  Education = factor(2, levels = levels(ub.org$Education)),
+  SecuritiesAccount = factor(0, levels = levels(ub.org$SecuritiesAccount)),
+  CDAccount = factor(0, levels = levels(ub.org$CDAccount)),
+  Online = factor(1, levels = levels(ub.org$Online)),
+  CreditCard = factor(1, levels = levels(ub.org$CreditCard))
+)
+
+# Final Prediction
+predict(svm_model_tuned, new.customer.norm)
